@@ -1,580 +1,542 @@
 /*
-Copyright (c) 2007, Jim Studt  (original old version - many contributors since)
-
-The latest version of this library may be found at:
-  http://www.pjrc.com/teensy/td_libs_OneWire.html
-
-OneWire has been maintained by Paul Stoffregen (paul@pjrc.com) since
-January 2010.
-
-DO NOT EMAIL for technical support, especially not for ESP chips!
-All project support questions must be posted on public forums
-relevant to the board or chips used.  If using Arduino, post on
-Arduino's forum.  If using ESP, post on the ESP community forums.
-There is ABSOLUTELY NO TECH SUPPORT BY PRIVATE EMAIL!
-
-Github's issue tracker for OneWire should be used only to report
-specific bugs.  DO NOT request project support via Github.  All
-project and tech support questions must be posted on forums, not
-github issues.  If you experience a problem and you are not
-absolutely sure it's an issue with the library, ask on a forum
-first.  Only use github to report issues after experts have
-confirmed the issue is with OneWire rather than your project.
-
-Back in 2010, OneWire was in need of many bug fixes, but had
-been abandoned the original author (Jim Studt).  None of the known
-contributors were interested in maintaining OneWire.  Paul typically
-works on OneWire every 6 to 12 months.  Patches usually wait that
-long.  If anyone is interested in more actively maintaining OneWire,
-please contact Paul (this is pretty much the only reason to use
-private email about OneWire).
-
-OneWire is now very mature code.  No changes other than adding
-definitions for newer hardware support are anticipated.
-
-Version 2.3:
-  Unknown chip fallback mode, Roger Clark
-  Teensy-LC compatibility, Paul Stoffregen
-  Search bug fix, Love Nystrom
-
-Version 2.2:
-  Teensy 3.0 compatibility, Paul Stoffregen, paul@pjrc.com
-  Arduino Due compatibility, http://arduino.cc/forum/index.php?topic=141030
-  Fix DS18B20 example negative temperature
-  Fix DS18B20 example's low res modes, Ken Butcher
-  Improve reset timing, Mark Tillotson
-  Add const qualifiers, Bertrik Sikken
-  Add initial value input to crc16, Bertrik Sikken
-  Add target_search() function, Scott Roberts
-
-Version 2.1:
-  Arduino 1.0 compatibility, Paul Stoffregen
-  Improve temperature example, Paul Stoffregen
-  DS250x_PROM example, Guillermo Lovato
-  PIC32 (chipKit) compatibility, Jason Dangel, dangel.jason AT gmail.com
-  Improvements from Glenn Trewitt:
-  - crc16() now works
-  - check_crc16() does all of calculation/checking work.
-  - Added read_bytes() and write_bytes(), to reduce tedious loops.
-  - Added ds2408 example.
-  Delete very old, out-of-date readme file (info is here)
-
-Version 2.0: Modifications by Paul Stoffregen, January 2010:
-http://www.pjrc.com/teensy/td_libs_OneWire.html
-  Search fix from Robin James
-    http://www.arduino.cc/cgi-bin/yabb2/YaBB.pl?num=1238032295/27#27
-  Use direct optimized I/O in all cases
-  Disable interrupts during timing critical sections
-    (this solves many random communication errors)
-  Disable interrupts during read-modify-write I/O
-  Reduce RAM consumption by eliminating unnecessary
-    variables and trimming many to 8 bits
-  Optimize both crc8 - table version moved to flash
-
-Modified to work with larger numbers of devices - avoids loop.
-Tested in Arduino 11 alpha with 12 sensors.
-26 Sept 2008 -- Robin James
-http://www.arduino.cc/cgi-bin/yabb2/YaBB.pl?num=1238032295/27#27
-
-Updated to work with arduino-0008 and to include skip() as of
-2007/07/06. --RJL20
-
-Modified to calculate the 8-bit CRC directly, avoiding the need for
-the 256-byte lookup table to be loaded in RAM.  Tested in arduino-0010
--- Tom Pollard, Jan 23, 2008
-
-Jim Studt's original library was modified by Josh Larios.
-
-Tom Pollard, pollard@alum.mit.edu, contributed around May 20, 2008
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
-LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-Much of the code was inspired by Derek Yerger's code, though I don't
-think much of that remains.  In any event that was..
-    (copyleft) 2006 by Derek Yerger - Free to distribute freely.
-
-The CRC code was excerpted and inspired by the Dallas Semiconductor
-sample code bearing this copyright.
-//---------------------------------------------------------------------------
-// Copyright (C) 2000 Dallas Semiconductor Corporation, All Rights Reserved.
-//
-// Permission is hereby granted, free of charge, to any person obtaining a
-// copy of this software and associated documentation files (the "Software"),
-// to deal in the Software without restriction, including without limitation
-// the rights to use, copy, modify, merge, publish, distribute, sublicense,
-// and/or sell copies of the Software, and to permit persons to whom the
-// Software is furnished to do so, subject to the following conditions:
-//
-// The above copyright notice and this permission notice shall be included
-// in all copies or substantial portions of the Software.
-//
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-// OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-// MERCHANTABILITY,  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-// IN NO EVENT SHALL DALLAS SEMICONDUCTOR BE LIABLE FOR ANY CLAIM, DAMAGES
-// OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-// ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-// OTHER DEALINGS IN THE SOFTWARE.
-//
-// Except as contained in this notice, the name of Dallas Semiconductor
-// shall not be used except as stated in the Dallas Semiconductor
-// Branding Policy.
-//--------------------------------------------------------------------------
-*/
-
-#include <Arduino.h>
-#include "OneWire.h"
-#include "util/OneWire_direct_gpio.h"
+ * micro:bit OneWire Library, derived from the mbed DS1820 Library, for the
+ * Dallas (Maxim) 1-Wire Digital Thermometer
+ * Copyright (c) 2010, Michael Hagberg Michael@RedBoxCode.com
+ *
+ * This version uses a single instance to talk to multiple one wire devices.
+ * During configuration the devices will be listed and the addresses
+ * then stored within the system  they are associated with.
+ *
+ * Then previously stored addresses are used to query devices.
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
 
 
-void OneWire::begin(uint8_t pin)
-{
-	pinMode(pin, INPUT);
-	bitmask = PIN_TO_BITMASK(pin);
-	baseReg = PIN_TO_BASEREG(pin);
-#if ONEWIRE_SEARCH
-	reset_search();
-#endif
-}
+#include "pxt.h"
+#include "TimedInterruptIn.h"
+#include <cstdio>
+#include <cmath>
+#include <vector>
+#include <cstring>
+#include <cstdlib>
 
+using namespace pxt;
 
-// Perform the onewire reset function.  We will wait up to 250uS for
-// the bus to come high, if it doesn't then it is broken or shorted
-// and we return a 0;
-//
-// Returns 1 if a device asserted a presence pulse, 0 otherwise.
-//
-uint8_t OneWire::reset(void)
-{
-	IO_REG_TYPE mask IO_REG_MASK_ATTR = bitmask;
-	volatile IO_REG_TYPE *reg IO_REG_BASE_ATTR = baseReg;
-	uint8_t r;
-	uint8_t retries = 125;
+namespace DS18B20 {
 
-	noInterrupts();
-	DIRECT_MODE_INPUT(reg, mask);
-	interrupts();
-	// wait until the wire is high... just in case
-	do {
-		if (--retries == 0) return 0;
-		delayMicroseconds(2);
-	} while ( !DIRECT_READ(reg, mask));
+  #define FAMILY_CODE address.rom[0]
+  //#define FAMILY_CODE 0x28
+  #define FAMILY_CODE_DS18S20 0x10 //9bit temp
+  #define FAMILY_CODE_DS18B20 0x28 //9-12bit temp also known as MAX31820
+  #define FAMILY_CODE_DS1822  0x22 //9-12bit temp
+  #define FAMILY_CODE_MAX31826 0x3B //12bit temp + 1k EEPROM
+  #define FAMILY_CODE_DS2404 0x04 //RTC
+  #define FAMILY_CODE_DS2417 0x27 //RTC
+  #define FAMILY_CODE_DS2740 0x36 //Current measurement
+  #define FAMILY_CODE_DS2502 0x09 //1k EEPROM
 
-	noInterrupts();
-	DIRECT_WRITE_LOW(reg, mask);
-	DIRECT_MODE_OUTPUT(reg, mask);	// drive output low
-	interrupts();
-	delayMicroseconds(480);
-	noInterrupts();
-	DIRECT_MODE_INPUT(reg, mask);	// allow it to float
-	delayMicroseconds(70);
-	r = !DIRECT_READ(reg, mask);
-	interrupts();
-	delayMicroseconds(410);
-	return r;
-}
+  static const int ReadScratchPadCommand = 0xBE;
+  static const int ReadPowerSupplyCommand = 0xB4;
+  static const int ConvertTempCommand = 0x44;
+  static const int MatchROMCommand = 0x55;
+  static const int ReadROMCommand = 0x33;
+  static const int SearchROMCommand = 0xF0;
+  static const int SkipROMCommand = 0xCC;
+  static const int WriteScratchPadCommand = 0x4E;
+  struct rom_address_t {
+      uint8_t rom[8];
+  };
 
-//
-// Write a bit. Port and bit is used to cut lookup time and provide
-// more certain timing.
-//
-void OneWire::write_bit(uint8_t v)
-{
-	IO_REG_TYPE mask IO_REG_MASK_ATTR = bitmask;
-	volatile IO_REG_TYPE *reg IO_REG_BASE_ATTR = baseReg;
+  std::vector<rom_address_t> found_addresses;
 
-	if (v & 1) {
-		noInterrupts();
-		DIRECT_WRITE_LOW(reg, mask);
-		DIRECT_MODE_OUTPUT(reg, mask);	// drive output low
-		delayMicroseconds(10);
-		DIRECT_WRITE_HIGH(reg, mask);	// drive output high
-		interrupts();
-		delayMicroseconds(55);
-	} else {
-		noInterrupts();
-		DIRECT_WRITE_LOW(reg, mask);
-		DIRECT_MODE_OUTPUT(reg, mask);	// drive output low
-		delayMicroseconds(65);
-		DIRECT_WRITE_HIGH(reg, mask);	// drive output high
-		interrupts();
-		delayMicroseconds(5);
-	}
-}
+  class OneWire {
+  public:
 
-//
-// Read a bit. Port and bit is used to cut lookup time and provide
-// more certain timing.
-//
-uint8_t OneWire::read_bit(void)
-{
-	IO_REG_TYPE mask IO_REG_MASK_ATTR = bitmask;
-	volatile IO_REG_TYPE *reg IO_REG_BASE_ATTR = baseReg;
-	uint8_t r;
+    enum {
+        invalid_conversion = -1000
+    };
 
-	noInterrupts();
-	DIRECT_MODE_OUTPUT(reg, mask);
-	DIRECT_WRITE_LOW(reg, mask);
-	delayMicroseconds(3);
-	DIRECT_MODE_INPUT(reg, mask);	// let pin float, pull up will raise
-	delayMicroseconds(10);
-	r = DIRECT_READ(reg, mask);
-	interrupts();
-	delayMicroseconds(53);
-	return r;
-}
-
-//
-// Write a byte. The writing code uses the active drivers to raise the
-// pin high, if you need power after the write (e.g. DS18S20 in
-// parasite power mode) then set 'power' to 1, otherwise the pin will
-// go tri-state at the end of the write to avoid heating in a short or
-// other mishap.
-//
-void OneWire::write(uint8_t v, uint8_t power /* = 0 */) {
-    uint8_t bitMask;
-
-    for (bitMask = 0x01; bitMask; bitMask <<= 1) {
-	OneWire::write_bit( (bitMask & v)?1:0);
+    OneWire(PinName data_pin, PinName power_pin = NC, bool power_polarity = 0) : _datapin(data_pin),_parasitepin(power_pin) {
+      _power_polarity = power_polarity;
+      _power_mosfet = power_pin != NC;
     }
-    if ( !power) {
-	noInterrupts();
-	DIRECT_MODE_INPUT(baseReg, bitmask);
-	DIRECT_WRITE_LOW(baseReg, bitmask);
-	interrupts();
+
+    ~OneWire(void) {
+      found_addresses.clear();
     }
-}
 
-void OneWire::write_bytes(const uint8_t *buf, uint16_t count, bool power /* = 0 */) {
-  for (uint16_t i = 0 ; i < count ; i++)
-    write(buf[i]);
-  if (!power) {
-    noInterrupts();
-    DIRECT_MODE_INPUT(baseReg, bitmask);
-    DIRECT_WRITE_LOW(baseReg, bitmask);
-    interrupts();
-  }
-}
+    void init() {
+      int byte_counter;
 
-//
-// Read a byte
-//
-uint8_t OneWire::read() {
-    uint8_t bitMask;
-    uint8_t r = 0;
+      for (byte_counter = 0; byte_counter < 9; byte_counter++)
+          RAM[byte_counter] = 0x00;
 
-    for (bitMask = 0x01; bitMask; bitMask <<= 1) {
-	if ( OneWire::read_bit()) r |= bitMask;
+      rom_address_t address;
+      _parasite_power = !powerSupplyAvailable(address, true);
     }
-    return r;
-}
 
-void OneWire::read_bytes(uint8_t *buf, uint16_t count) {
-  for (uint16_t i = 0 ; i < count ; i++)
-    buf[i] = read();
-}
+    int findAllDevicesOnBus() {
+      while (searchRomFindNext()) {
+      }
+      return (int) found_addresses.size();
+    }
 
-//
-// Do a ROM select
-//
-void OneWire::select(const uint8_t rom[8])
-{
-    uint8_t i;
+    rom_address_t &getAddress(int index) {
+      return found_addresses[index];
+    }
 
-    write(0x55);           // Choose ROM
-
-    for (i = 0; i < 8; i++) write(rom[i]);
-}
-
-//
-// Do a ROM skip
-//
-void OneWire::skip()
-{
-    write(0xCC);           // Skip ROM
-}
-
-void OneWire::depower()
-{
-	noInterrupts();
-	DIRECT_MODE_INPUT(baseReg, bitmask);
-	interrupts();
-}
-
-#if ONEWIRE_SEARCH
-
-//
-// You need to use this function to start a search again from the beginning.
-// You do not need to do it for the first search, though you could.
-//
-void OneWire::reset_search()
-{
-  // reset the search state
-  LastDiscrepancy = 0;
-  LastDeviceFlag = false;
-  LastFamilyDiscrepancy = 0;
-  for(int i = 7; ; i--) {
-    ROM_NO[i] = 0;
-    if ( i == 0) break;
-  }
-}
-
-// Setup the search to find the device type 'family_code' on the next call
-// to search(*newAddr) if it is present.
-//
-void OneWire::target_search(uint8_t family_code)
-{
-   // set the search state to find SearchFamily type devices
-   ROM_NO[0] = family_code;
-   for (uint8_t i = 1; i < 8; i++)
-      ROM_NO[i] = 0;
-   LastDiscrepancy = 64;
-   LastFamilyDiscrepancy = 0;
-   LastDeviceFlag = false;
-}
-
-//
-// Perform a search. If this function returns a '1' then it has
-// enumerated the next device and you may retrieve the ROM from the
-// OneWire::address variable. If there are no devices, no further
-// devices, or something horrible happens in the middle of the
-// enumeration then a 0 is returned.  If a new device is found then
-// its address is copied to newAddr.  Use OneWire::reset_search() to
-// start over.
-//
-// --- Replaced by the one from the Dallas Semiconductor web site ---
-//--------------------------------------------------------------------------
-// Perform the 1-Wire Search Algorithm on the 1-Wire bus using the existing
-// search state.
-// Return TRUE  : device found, ROM number in ROM_NO buffer
-//        FALSE : device not found, end of search
-//
-bool OneWire::search(uint8_t *newAddr, bool search_mode /* = true */)
-{
-   uint8_t id_bit_number;
-   uint8_t last_zero, rom_byte_number;
-   bool    search_result;
-   uint8_t id_bit, cmp_id_bit;
-
-   unsigned char rom_byte_mask, search_direction;
-
-   // initialize for search
-   id_bit_number = 1;
-   last_zero = 0;
-   rom_byte_number = 0;
-   rom_byte_mask = 1;
-   search_result = false;
-
-   // if the last call was not the last one
-   if (!LastDeviceFlag) {
-      // 1-Wire reset
-      if (!reset()) {
-         // reset the search
-         LastDiscrepancy = 0;
-         LastDeviceFlag = false;
-         LastFamilyDiscrepancy = 0;
-         return false;
+    int convertTemperature(rom_address_t &address, bool wait, bool all) {
+      // Convert temperature into scratchpad RAM for all devices at once
+      int delay_time = 1; // Default delay time
+      uint8_t resolution;
+      if (all)
+        skip_ROM();          // Skip ROM command, will convert for ALL devices, wait maximum time
+      else {
+        match_ROM(address);
+        if ((FAMILY_CODE == FAMILY_CODE_DS18B20) || (FAMILY_CODE == FAMILY_CODE_DS1822)) {
+          resolution = (uint8_t) (RAM[4] & 0x60);
+          if (resolution == 0x00) // 9 bits
+            delay_time = 94;
+          if (resolution == 0x20) // 10 bits
+            delay_time = 188;
+          if (resolution == 0x40) // 11 bits. Note 12bits uses the 750ms default
+            delay_time = 375;
+        }
+        if (FAMILY_CODE == FAMILY_CODE_MAX31826) {
+          delay_time = 150; // 12bit conversion
+        }
       }
 
-      // issue the search command
-      if (search_mode == true) {
-        write(0xF0);   // NORMAL SEARCH
+      onewire_byte_out(ConvertTempCommand);  // perform temperature conversion
+      if (_parasite_power) {
+        if (_power_mosfet) {
+          _parasitepin.write(_power_polarity);     // Parasite power strong pullup
+          wait_ms(delay_time);
+          _parasitepin.write(!_power_polarity);
+          delay_time = 0;
+        } else {
+          _datapin.output();
+          _datapin.write(1);
+          wait_ms(delay_time);
+          _datapin.input();
+        }
       } else {
-        write(0xEC);   // CONDITIONAL SEARCH
+          if (wait) {
+            wait_ms(delay_time);
+            delay_time = 0;
+        }
       }
+      return delay_time;
+    }
 
-      // loop to do the search
-      do
-      {
-         // read a bit and its complement
-         id_bit = read_bit();
-         cmp_id_bit = read_bit();
 
-         // check for no devices on 1-wire
-         if ((id_bit == 1) && (cmp_id_bit == 1)) {
+    int temperature(rom_address_t &address) {
+      //float answer, remaining_count, count_per_degree;
+      int reading = 0;
+      readScratchPad(address);
+/*
+      if (RAM_checksum_error()){
+        // Indicate we got a CRC error
+        answer = invalid_conversion;
+      }
+      else {
+        reading = (RAM[1] << 8) + RAM[0];
+        if (reading & 0x8000) { // negative degrees C
+          reading = 0 - ((reading ^ 0xffff) + 1); // 2's comp then convert to signed int
+        }
+        answer = (float)reading;
+        switch (FAMILY_CODE) {
+          case FAMILY_CODE_MAX31826:
+          case FAMILY_CODE_DS18B20:
+          case FAMILY_CODE_DS1822:
+            answer = answer / 16.0f;
             break;
-         } else {
-            // all devices coupled have 0 or 1
-            if (id_bit != cmp_id_bit) {
-               search_direction = id_bit;  // bit write value for search
+          case FAMILY_CODE_DS18S20:
+            remaining_count = RAM[6];
+            count_per_degree = RAM[7];
+            answer = (float) (floor(answer / 2.0f) - 0.25f +
+                              (count_per_degree - remaining_count) / count_per_degree);
+            break;
+          default:
+            //uBit.serial.printf("Unknown device family");
+            break;
+        }
+        if (convertToFarenheight) {
+            answer = answer * 9.0f / 5.0f + 32.0f;
+        }
+      }
+*/
+    reading = (RAM[1] << 8) + RAM[0];
+      return reading*100/16;
+    }
+
+    bool setResolution(rom_address_t &address, unsigned int resolution) {
+      bool answer = false;
+      switch (FAMILY_CODE) {
+        case FAMILY_CODE_DS18B20:
+        case FAMILY_CODE_DS18S20:
+        case FAMILY_CODE_DS1822:
+          resolution = resolution - 9;
+          if (resolution < 4) {
+            resolution = resolution << 5; // align the bits
+            RAM[4] = (uint8_t) ((RAM[4] & 0x60) | resolution); // mask out old data, insert new
+            writeScratchPad(address, (RAM[2] << 8) + RAM[3]);
+            answer = true;
+          }
+          break;
+        default:
+          break;
+      }
+      return answer;
+    }
+
+    void singleDeviceReadROM(rom_address_t &address) {
+      if (!onewire_reset()) {
+        return;
+      } else {
+        onewire_byte_out(ReadROMCommand);
+        for (int bit_index = 0; bit_index < 64; bit_index++) {
+          bool bit = onewire_bit_in();
+          bitWrite((uint8_t &) address.rom[bit_index / 8], (bit_index % 8), bit);
+        }
+      }
+    }
+
+    static rom_address_t addressFromHex(const char *hexAddress) {
+      rom_address_t address = rom_address_t();
+      for (uint8_t i = 0; i < sizeof(address.rom); i++) {
+        char buffer[3];
+        strncpy(buffer, &hexAddress[i * 2], 2);
+        buffer[2] = '\0';
+        address.rom[i] = (uint8_t) strtol(buffer, NULL, 16);
+      }
+      return address;
+    }
+
+  private:
+    DigitalInOut _datapin;
+    DigitalOut _parasitepin;
+    bool _parasite_power;
+    bool _power_mosfet;
+    bool _power_polarity;
+    uint8_t RAM[9];
+
+    uint8_t CRC_byte(uint8_t _CRC, uint8_t byte) {
+      int j;
+      for (j = 0; j < 8; j++) {
+        if ((byte & 0x01) ^ (_CRC & 0x01)) {
+          // DATA ^ LSB CRC = 1
+          _CRC = _CRC >> 1;
+          // Set the MSB to 1
+          _CRC = (uint8_t) (_CRC | 0x80);
+          // Check bit 3
+          if (_CRC & 0x04) {
+            _CRC = (uint8_t) (_CRC & 0xFB); // Bit 3 is set, so clear it
+          } else {
+            _CRC = (uint8_t) (_CRC | 0x04); // Bit 3 is clear, so set it
+          }
+          // Check bit 4
+          if (_CRC & 0x08) {
+            _CRC = (uint8_t) (_CRC & 0xF7); // Bit 4 is set, so clear it
+          } else {
+            _CRC = (uint8_t) (_CRC | 0x08); // Bit 4 is clear, so set it
+          }
+        } else {
+          // DATA ^ LSB CRC = 0
+          _CRC = _CRC >> 1;
+          // clear MSB
+          _CRC = (uint8_t) (_CRC & 0x7F);
+          // No need to check bits, with DATA ^ LSB CRC = 0, they will remain unchanged
+        }
+        byte = byte >> 1;
+      }
+      return _CRC;
+    }
+
+    void bitWrite(uint8_t &value, int bit, bool set) {
+      if (bit <= 7 && bit >= 0) {
+        if (set) {
+          value |= (1 << bit);
+        } else {
+          value &= ~(1 << bit);
+        }
+      }
+    }
+
+
+    bool onewire_reset() {
+    // This will return false if no devices are present on the data bus
+      bool presence = false;
+      _datapin.output();
+      _datapin.write(0);          // bring low for 480 us
+      wait_us(480);
+      _datapin.write(1);
+      wait_us(20);
+      _datapin.input();       // let the data line float high
+      wait_us(25);
+      if (_datapin.read() == 0) // see if any devices are pulling the data line low
+        presence = true;
+      wait_us(120);
+      return presence;
+    }
+
+    void match_ROM(rom_address_t &address) {
+      int i;
+      onewire_reset();
+      onewire_byte_out(MatchROMCommand);
+      for (i = 0; i < 8; i++) {
+        onewire_byte_out(address.rom[i]);
+      }
+    }
+
+    void skip_ROM() {
+      onewire_reset();
+      onewire_byte_out(SkipROMCommand);
+      //onewire_byte_out(0x20);
+    }
+
+    void onewire_bit_out(bool bit_data) {
+      _datapin.output();
+      __disable_irq();
+      _datapin.write(0);
+      wait_us(3);                 // DXP modified from 5 to 3 (spec 1-15us)
+      if (bit_data) {
+        _datapin.write(1); // bring data line high
+        __enable_irq();
+        wait_us(55);
+      } else {
+        wait_us(60);            // keep data line low (spec 60-120us)
+        _datapin.write(1);
+        __enable_irq();
+        wait_us(5);            // DXP added 10 to allow bus to float high before next bit_out
+      }
+    }
+
+    void onewire_byte_out(uint8_t data) {
+      int n;
+      for (n = 0; n < 8; n++) {
+        onewire_bit_out((bool) (data & 0x01));
+        data = data >> 1; // now the next bit is in the least sig bit position.
+      }
+    }
+
+    bool onewire_bit_in() {
+      bool answer;
+      _datapin.output();
+      __disable_irq();
+      _datapin.write(0);
+      wait_us(3);                 // DXP modified from 5 (spec 1-15us)
+      _datapin.input();
+      wait_us(3);                // DXP modified from 5 to 10 this broke microbit timing (spec read within 15us)
+      answer = (bool) _datapin.read();
+      __enable_irq();
+      wait_us(45);                // DXP modified from 50 to 45, but Arduino uses 53?
+      return answer;
+    }
+
+    uint8_t onewire_byte_in() {
+      uint8_t answer = 0x00;
+      int i;
+      for (i = 0; i < 8; i++) {
+        answer = answer >> 1; // shift over to make room for the next bit
+        if (onewire_bit_in())
+          answer = (uint8_t) (answer | 0x80); // if the data port is high, make this bit a 1
+      }
+      return answer;
+    }
+
+    bool ROM_checksum_error(uint8_t *_ROM_address) {
+      uint8_t _CRC = 0x00;
+      int i;
+      for (i = 0; i < 7; i++) // Only going to shift the lower 7 bytes
+        _CRC = CRC_byte(_CRC, _ROM_address[i]);
+      // After 7 bytes CRC should equal the 8th byte (ROM CRC)
+      return (_CRC != _ROM_address[7]); // will return true if there is a CRC checksum mis-match
+    }
+
+    bool RAM_checksum_error() {
+      uint8_t _CRC = 0x00;
+      int i;
+      for (i = 0; i < 8; i++) // Only going to shift the lower 8 bytes
+        _CRC = CRC_byte(_CRC, RAM[i]);
+      // After 8 bytes CRC should equal the 9th byte (RAM CRC)
+      return (_CRC != RAM[8]); // will return true if there is a CRC checksum mis-match
+    }
+
+    bool searchRomFindNext() {
+      bool DS1820_done_flag = false;
+      int ds1820_last_descrepancy = 0;
+      uint8_t DS1820_search_ROM[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+
+      int descrepancyMarker, ROM_bit_index;
+      bool return_value, Bit_A, Bit_B;
+      uint8_t byte_counter, bit_mask;
+
+      return_value = false;
+      while (!DS1820_done_flag) {
+        if (!onewire_reset()) {
+          //uBit.serial.printf("Failed to reset one wire bus\n");
+          return false;
+        } else {
+          ROM_bit_index = 1;
+          descrepancyMarker = 0;
+          onewire_byte_out(SearchROMCommand);
+          byte_counter = 0;
+          bit_mask = 0x01;
+          while (ROM_bit_index <= 64) {
+            Bit_A = onewire_bit_in();
+            Bit_B = onewire_bit_in();
+            if (Bit_A & Bit_B) {
+              descrepancyMarker = 0; // data read error, this should never happen
+              ROM_bit_index = 0xFF;
+              //uBit.serial.printf("Data read error - no devices on bus?\r\n");
             } else {
-               // if this discrepancy if before the Last Discrepancy
-               // on a previous next then pick the same as last time
-               if (id_bit_number < LastDiscrepancy) {
-                  search_direction = ((ROM_NO[rom_byte_number] & rom_byte_mask) > 0);
-               } else {
-                  // if equal to last pick 1, if not then pick 0
-                  search_direction = (id_bit_number == LastDiscrepancy);
-               }
-               // if 0 was picked then record its position in LastZero
-               if (search_direction == 0) {
-                  last_zero = id_bit_number;
-
-                  // check for Last discrepancy in family
-                  if (last_zero < 9)
-                     LastFamilyDiscrepancy = last_zero;
-               }
+              if (Bit_A | Bit_B) {
+                // Set ROM bit to Bit_A
+                if (Bit_A) {
+                  DS1820_search_ROM[byte_counter] = DS1820_search_ROM[byte_counter] | bit_mask; // Set ROM bit to one
+                } else {
+                  DS1820_search_ROM[byte_counter] = DS1820_search_ROM[byte_counter] & ~bit_mask; // Set ROM bit to zero
+                }
+              } else {
+                // both bits A and B are low, so there are two or more devices present
+                if (ROM_bit_index == ds1820_last_descrepancy) {
+                  DS1820_search_ROM[byte_counter] = DS1820_search_ROM[byte_counter] | bit_mask; // Set ROM bit to one
+                } else {
+                  if (ROM_bit_index > ds1820_last_descrepancy) {
+                      DS1820_search_ROM[byte_counter] = DS1820_search_ROM[byte_counter] & ~bit_mask; // Set ROM bit to zero
+                      descrepancyMarker = ROM_bit_index;
+                  } else {
+                    if ((DS1820_search_ROM[byte_counter] & bit_mask) == 0x00)
+                      descrepancyMarker = ROM_bit_index;
+                  }
+                }
+              }
+              onewire_bit_out(DS1820_search_ROM[byte_counter] & bit_mask);
+              ROM_bit_index++;
+              if (bit_mask & 0x80) {
+                byte_counter++;
+                bit_mask = 0x01;
+              } else {
+                bit_mask = bit_mask << 1;
+              }
             }
+          }
+          ds1820_last_descrepancy = descrepancyMarker;
+          if (ROM_bit_index != 0xFF) {
+            uint8_t i = 0;
+            while (1) {
+              if (i >= found_addresses.size()) {                             //End of list, or empty list
+                if (ROM_checksum_error(DS1820_search_ROM)) {          // Check the CRC
+                  //uBit.serial.printf("failed crc\r\n");
+                  return false;
+                }
+                rom_address_t address;
+                for (byte_counter = 0; byte_counter < 8; byte_counter++) {
+                  address.rom[byte_counter] = DS1820_search_ROM[byte_counter];
+                }
+                found_addresses.push_back(address);
 
-            // set or clear the bit in the ROM byte rom_byte_number
-            // with mask rom_byte_mask
-            if (search_direction == 1)
-              ROM_NO[rom_byte_number] |= rom_byte_mask;
-            else
-              ROM_NO[rom_byte_number] &= ~rom_byte_mask;
+                return true;
+              } else {                    //Otherwise, check if ROM is already known
+                bool equal = true;
+                uint8_t *ROM_compare = found_addresses[i].rom;
 
-            // serial number search direction write bit
-            write_bit(search_direction);
-
-            // increment the byte counter id_bit_number
-            // and shift the mask rom_byte_mask
-            id_bit_number++;
-            rom_byte_mask <<= 1;
-
-            // if the mask is 0 then go to new SerialNum byte rom_byte_number and reset mask
-            if (rom_byte_mask == 0) {
-                rom_byte_number++;
-                rom_byte_mask = 1;
+                for (byte_counter = 0; (byte_counter < 8) && equal; byte_counter++) {
+                  if (ROM_compare[byte_counter] != DS1820_search_ROM[byte_counter])
+                    equal = false;
+                }
+                if (equal)
+                  break;
+                else
+                  i++;
+              }
             }
-         }
+          }
+        }
+        if (ds1820_last_descrepancy == 0)
+          DS1820_done_flag = true;
       }
-      while(rom_byte_number < 8);  // loop until through all ROM bytes 0-7
+      return return_value;
+    }
 
-      // if the search was successful then
-      if (!(id_bit_number < 65)) {
-         // search successful so set LastDiscrepancy,LastDeviceFlag,search_result
-         LastDiscrepancy = last_zero;
-
-         // check for last device
-         if (LastDiscrepancy == 0) {
-            LastDeviceFlag = true;
-         }
-         search_result = true;
+    void readScratchPad(rom_address_t &address) {
+      int i;
+      match_ROM(address);
+      onewire_byte_out(ReadScratchPadCommand);
+      for (i = 0; i < 9; i++) {
+        RAM[i] = onewire_byte_in();
       }
-   }
+    }
 
-   // if no device found then reset counters so next 'search' will be like a first
-   if (!search_result || !ROM_NO[0]) {
-      LastDiscrepancy = 0;
-      LastDeviceFlag = false;
-      LastFamilyDiscrepancy = 0;
-      search_result = false;
-   } else {
-      for (int i = 0; i < 8; i++) newAddr[i] = ROM_NO[i];
-   }
-   return search_result;
+    void writeScratchPad(rom_address_t &address, int data) {
+      RAM[3] = (uint8_t) data;
+      RAM[2] = (uint8_t) (data >> 8);
+      match_ROM(address);
+      onewire_byte_out(WriteScratchPadCommand);
+      onewire_byte_out(RAM[2]); // T(H)
+      onewire_byte_out(RAM[3]); // T(L)
+      if ((FAMILY_CODE == FAMILY_CODE_DS18S20)|| (FAMILY_CODE == FAMILY_CODE_DS18B20) || (FAMILY_CODE == FAMILY_CODE_DS1822)) {
+        onewire_byte_out(RAM[4]); // Configuration register
+      }
+    }
+
+    bool powerSupplyAvailable(rom_address_t &address, bool all) {
+      if (all)
+        skip_ROM();
+      else
+        match_ROM(address);
+      onewire_byte_out(ConvertTempCommand);
+      wait_ms(1);//////////////////
+      return onewire_bit_in();
+    }
+  };
+
+  //MicroBit uBit;
+  MicroBitPin pin = uBit.io.P0;
+  //%
+  int16_t Temperature(int p) {
+    
+    switch(p){
+      case 0: pin = uBit.io.P0; break;
+      case 1: pin = uBit.io.P1; break;
+      case 2: pin = uBit.io.P2; break;
+      case 5: pin = uBit.io.P5; break;
+      case 8: pin = uBit.io.P8; break;
+      case 11: pin = uBit.io.P11; break;
+      case 12: pin = uBit.io.P12; break;
+      case 13: pin = uBit.io.P13; break;
+      case 14: pin = uBit.io.P14; break;
+      case 15: pin = uBit.io.P15; break;
+      case 16: pin = uBit.io.P16; break;
+      default: pin = uBit.io.P0;
+    }
+    
+    OneWire oneWire(pin.name);
+    oneWire.init();
+    oneWire.findAllDevicesOnBus();
+    rom_address_t address;
+    oneWire.singleDeviceReadROM(address);
+    oneWire.convertTemperature(address, true, true);
+    return oneWire.temperature(address);
+    //return 0;
   }
-
-#endif
-
-#if ONEWIRE_CRC
-// The 1-Wire CRC scheme is described in Maxim Application Note 27:
-// "Understanding and Using Cyclic Redundancy Checks with Maxim iButton Products"
-//
-
-#if ONEWIRE_CRC8_TABLE
-// Dow-CRC using polynomial X^8 + X^5 + X^4 + X^0
-// Tiny 2x16 entry CRC table created by Arjen Lentz
-// See http://lentz.com.au/blog/calculating-crc-with-a-tiny-32-entry-lookup-table
-static const uint8_t PROGMEM dscrc2x16_table[] = {
-	0x00, 0x5E, 0xBC, 0xE2, 0x61, 0x3F, 0xDD, 0x83,
-	0xC2, 0x9C, 0x7E, 0x20, 0xA3, 0xFD, 0x1F, 0x41,
-	0x00, 0x9D, 0x23, 0xBE, 0x46, 0xDB, 0x65, 0xF8,
-	0x8C, 0x11, 0xAF, 0x32, 0xCA, 0x57, 0xE9, 0x74
-};
-
-// Compute a Dallas Semiconductor 8 bit CRC. These show up in the ROM
-// and the registers.  (Use tiny 2x16 entry CRC table)
-uint8_t OneWire::crc8(const uint8_t *addr, uint8_t len)
-{
-	uint8_t crc = 0;
-
-	while (len--) {
-		crc = *addr++ ^ crc;  // just re-using crc as intermediate
-		crc = pgm_read_byte(dscrc2x16_table + (crc & 0x0f)) ^
-		pgm_read_byte(dscrc2x16_table + 16 + ((crc >> 4) & 0x0f));
-	}
-
-	return crc;
 }
-#else
-//
-// Compute a Dallas Semiconductor 8 bit CRC directly.
-// this is much slower, but a little smaller, than the lookup table.
-//
-uint8_t OneWire::crc8(const uint8_t *addr, uint8_t len)
-{
-	uint8_t crc = 0;
-
-	while (len--) {
-#if defined(__AVR__)
-		crc = _crc_ibutton_update(crc, *addr++);
-#else
-		uint8_t inbyte = *addr++;
-		for (uint8_t i = 8; i; i--) {
-			uint8_t mix = (crc ^ inbyte) & 0x01;
-			crc >>= 1;
-			if (mix) crc ^= 0x8C;
-			inbyte >>= 1;
-		}
-#endif
-	}
-	return crc;
-}
-#endif
-
-#if ONEWIRE_CRC16
-bool OneWire::check_crc16(const uint8_t* input, uint16_t len, const uint8_t* inverted_crc, uint16_t crc)
-{
-    crc = ~crc16(input, len, crc);
-    return (crc & 0xFF) == inverted_crc[0] && (crc >> 8) == inverted_crc[1];
-}
-
-uint16_t OneWire::crc16(const uint8_t* input, uint16_t len, uint16_t crc)
-{
-#if defined(__AVR__)
-    for (uint16_t i = 0 ; i < len ; i++) {
-        crc = _crc16_update(crc, input[i]);
-    }
-#else
-    static const uint8_t oddparity[16] =
-        { 0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0 };
-
-    for (uint16_t i = 0 ; i < len ; i++) {
-      // Even though we're just copying a byte from the input,
-      // we'll be doing 16-bit computation with it.
-      uint16_t cdata = input[i];
-      cdata = (cdata ^ crc) & 0xff;
-      crc >>= 8;
-
-      if (oddparity[cdata & 0x0F] ^ oddparity[cdata >> 4])
-          crc ^= 0xC001;
-
-      cdata <<= 6;
-      crc ^= cdata;
-      cdata <<= 1;
-      crc ^= cdata;
-    }
-#endif
-    return crc;
-}
-#endif
-
-#endif
+© 2021 GitHub, Inc.
